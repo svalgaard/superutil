@@ -1,0 +1,48 @@
+#! /usr/bin/env python
+#
+# Move all files sharing a common prefix (or postfix) to another shared
+# prefix (or postfix)
+#
+# (c) 2016, Jens Svalgaard Kohrt
+#
+
+import sys
+import os
+import glob
+
+PREFIX = True
+
+
+def main():
+    global PREFIX
+    if sys.argv[1:] and sys.argv[1] == '-x':
+        PREFIX = False
+        del sys.argv[1]
+    if not len(sys.argv) == 3:
+        print 'Usage: [-x] %s OLDPREFIX NEWPREFIX' % sys.argv[0]
+        print '-x implies actually renaming by POSTFIX'
+        sys.exit(1)
+
+    OPREFIX,NPREFIX = sys.argv[1:]
+
+    ofns = glob.glob(('%s*' % OPREFIX) if PREFIX else ('*%s' % OPREFIX))
+
+    afns = []
+    for ofn in ofns:
+        if PREFIX:
+            nfn = NPREFIX + ofn[len(OPREFIX):]
+        else:
+            nfn = ofn[:-len(OPREFIX)] + NPREFIX
+        print ofn, '-->', nfn
+        if os.path.isfile(nfn):
+            print nfn, 'already exists'
+        assert(not os.path.isfile(nfn))
+        afns.append((ofn, nfn))
+
+    raw_input('Press ENTER to really rename the files')
+
+    for (ofn, nfn) in afns:
+        os.rename(ofn, nfn)
+
+if __name__ == '__main__':
+    main()
