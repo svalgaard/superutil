@@ -1,0 +1,49 @@
+#! /usr/bin/env python
+#
+# (c) 2011-16, Jens Svalgaard Kohrt
+#
+
+import os
+import sys
+
+
+def help():
+    print 'Usage: %s [-i keyfile] [user@hostname]' % sys.argv[0]
+    print 'Copies an ssh key to a remote machine'
+    sys.exit(0)
+
+args = sys.argv[1:]
+key = ''
+if '-h' in args:
+    help()
+if len(args) > 1 and args[0] == '-i':
+    keyfile = args[1]
+    del args[:2]
+elif os.popen('ssh-add -L', 'r').read():
+    key = os.popen('ssh-add -L', 'r').read()
+else:
+    keyfile = os.path.expanduser('~/.ssh/id_rsa.pub')
+
+if not key:
+    try:
+        key = open(keyfile).read()
+        assert(key)  # assert non-empty key
+    except IOError:
+        print '%s does not exist or is unreadable' % keyfile
+        help()
+
+if len(args) != 1:
+    print 'No hostname specified'
+    help()
+
+host = args[0]
+rcmd = "mkdir -p -m 700 .ssh ; cat >> .ssh/authorized_keys ; chmod 700 .ssh/authorized_keys"
+cmd = 'echo %s | ssh %s "%s"' % (key.strip(), host, rcmd)
+
+os.system(cmd)
+
+print '''Now try to login on the remote machine using
+
+   ssh %s
+
+You should probably check .ssh/authorized_keys to ensure that we copied the right key.''' % host
