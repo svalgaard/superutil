@@ -1,0 +1,91 @@
+#! /usr/bin/env python
+#
+# Tests whether a web site is vunerable to TRACE and TRACK requests
+#
+# Usage: httpdtest-trace-track.py example.com
+#
+# (c) 2016, Jens Svalgaard Kohrt
+#
+
+import telnetlib
+import optparse
+import sys
+import socket
+
+
+def test(hostname, method):
+    try:
+        tn = telnetlib.Telnet(hostname, 80)
+    except socket.gaierror:
+        sys.stderr.write('Unable to connect to %s\n' % hostname)
+        return False
+    req = '''%s / HTTP/1.0
+A: b
+C: d
+Host: %s
+
+''' % (method, hostname)
+    # print req
+    tn.write(req)
+    print 'Reading response from %s... [%s]' % (hostname, method)
+    data = tn.read_all()
+    print data.split('\n')[0]
+    tn.close()
+    print
+
+    # did we fail or succeed?
+    return '4' == data.split()[1][0]
+
+
+def main():
+    parser = optparse.OptionParser()
+
+    parser.usage = '''%prog [options] hostname
+
+Detect whether a http host allows TRACK or TRACE requests. Default is to check for both.'''
+
+    parser.add_option('--trace', dest='trace', action='store_true', default=False,
+                      help='Detect whether only TRACE requests are allowed')
+
+    parser.add_option('--track', dest='track', action='store_true', default=False,
+                      help='Detect whether only TRACK requests are allowed')
+
+    options, args = parser.parse_args()
+
+    if len(args) != 1:
+        parser.error('Please supply a host name')
+    options.hostname = args[0]
+
+    tests = {}  # Mapping of TESTNAME to test result
+    if options.trace:
+        tests['TRACE'] = None
+    if options.track:
+        tests['TRACK'] = None
+    if not tests:
+        tests = {'TRACE': None, 'TRACK': None}
+
+    for method in sorted(tests.keys()):
+        res = test(options.hostname, method)
+        tests[method] = res
+
+    print 'Result:'
+    allOk = True
+    for method in sorted(tests.keys()):
+        if tests[method]:
+            res = 'OK'
+        else:
+            res = 'FAILED'
+            allOk = False
+        print '%s : %s ' % (method, res)
+
+    if not allOk:
+        print '''Probably not everything was OK. Please add the following to your httpd.conf:
+
+        # disable TRACK and TRACE
+        RewriteEngine On
+        RewriteCond %{REQUEST_METHOD} ^TRACE
+        RewriteRule .* - [F]
+        RewriteCond %{REQUEST_METHOD} ^TRACK
+        RewriteRule .* - [F]'''
+
+main()
